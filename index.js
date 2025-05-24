@@ -66,13 +66,20 @@ app.post('/api/login', async (req, res) => {
   const { email, password, userType } = req.body;
   try {
     const user = await User.findOne({ email });
-    if (!user || user.userType !== userType) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!user || user.userType !== userType)
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ success: false, message: 'Incorrect password' });
+    if (!match)
+      return res.status(401).json({ success: false, message: 'Incorrect password' });
 
     req.session.userId = user._id;
     req.session.userType = user.userType;
-    res.json({ success: true, userId: user._id, userType: user.userType });
+    res.json({
+      success: true,
+      userId: user._id,
+      userType: user.userType,
+      message: 'Login successful'
+    });
   } catch {
     res.status(500).json({ success: false, message: 'Login failed' });
   }
@@ -198,13 +205,24 @@ app.post('/api/book', async (req, res) => {
     const user = await User.findById(userId);
     if (!user || user.userType !== 'attendee') return res.status(403).json({ error: 'Only attendees can book' });
 
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    // Count current bookings for this event
+    const bookedCount = await Booking.countDocuments({ eventId });
+    const availableSeats = event.seats - bookedCount;
+
+    // If already booked, cancel booking and increase seat
     const existing = await Booking.findOne({ userId, eventId });
     if (existing) {
       await Booking.deleteOne({ _id: existing._id });
       return res.json({ booked: false, message: 'Booking canceled' });
     } else {
+      if (availableSeats <= 0) {
+        return res.status(400).json({ booked: false, message: 'No seats available' });
+      }
       await new Booking({ userId, eventId, seatsBooked: 1 }).save();
-      return res.json({ booked: true, message: 'Booking successful' });
+      return res.json({ booked: true, message: 'Booking successful', seatsLeft: availableSeats - 1 });
     }
   } catch (err) {
     console.error('Booking error:', err);
@@ -213,21 +231,26 @@ app.post('/api/book', async (req, res) => {
 });
 
 // === COMMENTS ===
+/*
 app.post('/api/events/:id/comment', async (req, res) => {
   const { userId, text } = req.body;
   const eventId = req.params.id;
 
   try {
-    const user = await User.findById(userId).lean();
-    if (!user || user.userType !== 'attendee') {
-      return res.status(403).json({ error: 'Only attendees can comment' });
-    }
-
-    const comment = { userId, text, createdAt: new Date() };
     const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    // Don't include eventId in the comment object
+    const comment = {
+      userId,
+      text,
+      createdAt: new Date()
+    };
     event.comments.push(comment);
     await event.save();
 
+    // Optionally, populate user info for response
+    const user = await User.findById(userId);
     res.json({
       success: true,
       comment: {
@@ -248,21 +271,23 @@ app.post('/api/events/:id/comment', async (req, res) => {
 
 app.get('/api/events/:id/comments', async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).populate({
-      path: 'comments.userId',
-      select: 'name profilePic email'
-    }).lean();
-
+    const event = await Event.findById(req.params.id).lean();
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    const comments = event.comments.map(c => ({
-      text: c.text,
-      createdAt: c.createdAt,
-      user: {
-        name: c.userId?.name || c.userId?.email?.split('@')[0],
-        profilePic: c.userId?.profilePic || '/default-avatar.png'
-      }
-    }));
+    // Manually populate user info for each comment
+    const comments = await Promise.all(
+      (event.comments || []).map(async c => {
+        const user = await User.findById(c.userId).lean();
+        return {
+          text: c.text,
+          createdAt: c.createdAt,
+          user: {
+            name: user?.name || user?.email?.split('@')[0] || 'Unknown',
+            profilePic: user?.profilePic || '/default-avatar.png'
+          }
+        };
+      })
+    );
 
     res.json({ comments });
   } catch (err) {
@@ -270,6 +295,7 @@ app.get('/api/events/:id/comments', async (req, res) => {
     res.status(500).json({ error: 'Failed to load comments' });
   }
 });
+*/
 
 // === PROFILE ===
 app.get('/api/user/:id', async (req, res) => {

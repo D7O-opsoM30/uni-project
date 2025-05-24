@@ -22,9 +22,22 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.profile-picture img').src = data.profilePic;
       }
 
+      // Merge saved and favorite events, removing duplicates
+      const allSaved = [...(data.saved || [])];
+      // If you have a separate favorites array, merge it here
+      // Example: if (data.favorites) allSaved.push(...data.favorites);
+      // Remove duplicates by event _id
+      const uniqueSaved = [];
+      const seen = new Set();
+      allSaved.forEach(ev => {
+        if (ev && ev._id && !seen.has(ev._id)) {
+          uniqueSaved.push(ev);
+          seen.add(ev._id);
+        }
+      });
       renderEventList(data.upcoming, 'upcoming-events');
       renderEventList(data.past, 'past-events');
-      renderEventList(data.saved, 'saved-events', true);
+      renderEventList(uniqueSaved, 'saved-events', true);
     })
     .catch(() => {
       alert("Failed to load user profile.");
@@ -88,6 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(`${tab}-tab`).style.display = 'block';
     });
   });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('close') || e.target.id === 'event-modal') {
+      document.getElementById('event-modal').style.display = 'none';
+    }
+  });
 });
 
 function calculateYears(dateStr) {
@@ -105,21 +124,18 @@ function renderEventList(events, containerId, saved = false) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
   if (!events || events.length === 0) {
-    container.innerHTML = '<p>No events available.</p>';
+    container.innerHTML = '<p class="no-events">No events found.</p>';
     return;
   }
-
   events.forEach(event => {
-    const item = document.createElement('div');
-    item.className = 'event-item';
-    item.innerHTML = `
-      <h4>${event.name}</h4>
-      <p><i class="fas fa-calendar"></i> ${new Date(event.date).toLocaleDateString()}</p>
-      <p><i class="fas fa-map-marker-alt"></i> ${event.location}</p>
-      <div class="event-actions">
-        <button class="btn">${saved ? 'Remove from Saved' : 'View Details'}</button>
-      </div>
+    const card = document.createElement('div');
+    card.className = 'event-card';
+    card.innerHTML = `
+      <img src="${event.image}" alt="${event.name}" class="event-img">
+      <h3>${event.name}</h3>
+      <p>${event.location} - ${new Date(event.date).toLocaleDateString()}</p>
+      <!-- View Details button removed -->
     `;
-    container.appendChild(item);
+    container.appendChild(card);
   });
 }

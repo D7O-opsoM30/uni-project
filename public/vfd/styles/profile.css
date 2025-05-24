@@ -134,3 +134,11 @@ p {
 .tab-content {
   padding: 1.5rem 0;
 }
+.event-img {
+  width: 220px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto 10px auto;
+}

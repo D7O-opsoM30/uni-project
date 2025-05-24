@@ -1,9 +1,8 @@
 const mongoose = require('mongoose');
 
-// === Comment Schema
+// === Comment Schema (NO eventId here)
 const CommentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
   text: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
@@ -22,7 +21,8 @@ const EventSchema = new mongoose.Schema({
     required: true
   },
   image: { type: String },
-  organizerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+  organizerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  // comments: [CommentSchema] // <-- This line is critical!
 }, { timestamps: true });
 
 // === Favorite Schema

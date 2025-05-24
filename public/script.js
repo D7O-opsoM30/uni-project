@@ -81,7 +81,7 @@ function showEventModal(event) {
     <img src="${event.image}" alt="${event.name}" style="width: 100%; max-height: 300px; object-fit: cover;">
     <p><strong>Date:</strong> ${new Date(event.date).toLocaleString()}</p>
     <p><strong>Location:</strong> ${event.location}</p>
-    <p><strong>Seats:</strong> ${event.seats}</p>
+    <p><strong>Seats:</strong> <span id="seats-count">${event.seats}</span></p>
     <p><strong>Price:</strong> ${event.price || 0} SAR</p>
     <p><strong>Description:</strong> ${event.description}</p>
     <div class="payment-options">
@@ -95,67 +95,59 @@ function showEventModal(event) {
         <i class="fas fa-heart${event.isFavorite ? ' favorited' : ''}"></i>
       </button>
     </div>
-    <div class="comments-section">
-      <h3>Comments</h3>
-      <div id="comments-list"></div>
-      <textarea id="new-comment" placeholder="Write a comment..."></textarea>
-      <button id="submit-comment">Post Comment</button>
-    </div>
   `;
 
   modal.style.display = 'block';
 
-  // Load comments
-  fetch(`/api/comments/${event._id}`)
-    .then(res => res.json())
-    .then(data => {
-      const commentsContainer = document.getElementById('comments-list');
-      commentsContainer.innerHTML = '';
-      data.forEach(comment => {
-        const div = document.createElement('div');
-        div.classList.add('comment');
-        div.innerHTML = `
-          <div class="comment-user">
-            <img src="${comment.user.profilePic || '/images/default-user.png'}" class="comment-avatar">
-            <span class="comment-name">${comment.user.name}</span>
-          </div>
-          <p class="comment-text">${comment.text}</p>
-        `;
-        commentsContainer.appendChild(div);
-      });
-    });
-
-  // Post comment
-  document.getElementById('submit-comment').onclick = async () => {
-    const text = document.getElementById('new-comment').value.trim();
-    if (!text) return;
-    await fetch('/api/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, eventId: event._id, text })
-    });
-    document.getElementById('new-comment').value = '';
-    showEventModal(event); // Refresh modal content
-  };
-
-  // Check booking
+  // Check booking and seats
   fetch(`/api/user/${userId}`)
     .then(res => res.json())
     .then(userData => {
       const booked = userData.upcoming.concat(userData.past).some(e => e._id === event._id);
       const bookBtn = document.getElementById('modal-book-btn');
-      bookBtn.textContent = booked ? 'Unbook' : 'Book';
+      const seatsCount = document.getElementById('seats-count');
+      let seats = event.seats;
+
+      // If seats are 0 and not already booked, disable booking
+      if (seats <= 0 && !booked) {
+        bookBtn.textContent = 'Sold Out';
+        bookBtn.disabled = true;
+      } else {
+        bookBtn.textContent = booked ? 'Unbook' : 'Book';
+        bookBtn.disabled = false;
+      }
 
       bookBtn.onclick = async () => {
+        // Prevent booking if sold out
+        if (seats <= 0 && !booked) return;
+
         const res = await fetch('/api/book', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, eventId: event._id })
         });
         const data = await res.json();
+
+        // Update seats count locally for instant feedback
+        if (data.booked) {
+          seats -= 1;
+        } else {
+          seats += 1;
+        }
+        seatsCount.textContent = seats;
+
+        // Update button state
+        if (seats <= 0 && !data.booked) {
+          bookBtn.textContent = 'Sold Out';
+          bookBtn.disabled = true;
+        } else {
+          bookBtn.textContent = data.booked ? 'Unbook' : 'Book';
+          bookBtn.disabled = false;
+        }
+
         alert(data.message || 'Booking updated');
         fetchEvents();
-        showEventModal(event);
+        showEventModal({ ...event, seats }); // Pass updated seats
       };
     });
 
@@ -173,3 +165,7 @@ function showEventModal(event) {
     fetchEvents();
   };
 }
+
+<div id="event-modal" class="modal" style="display:none;">
+  <div id="event-details" class="modal-content"></div>
+</div>
