@@ -4,7 +4,15 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function fetchEvents() {
-  const userId = localStorage.getItem('userId');
+  const container = document.getElementById('events-container');
+  container.innerHTML = `
+    <div class="loading-events">
+      <i class="fas fa-spinner fa-spin"></i>
+      <p>Loading events...</p>
+    </div>
+  `;
+
+  const userId = localStorage.getItem('userId') || '';
   fetch(`/api/events?userId=${userId}`)
     .then(res => res.json())
     .then(events => {
@@ -13,7 +21,7 @@ function fetchEvents() {
       renderEvents(events);
     })
     .catch(err => {
-      document.getElementById('events-container').innerHTML = '<p class="error">Failed to load events.</p>';
+      container.innerHTML = '<p class="error">Failed to load events.</p>';
       console.error('Error fetching events:', err);
     });
 }
@@ -99,7 +107,6 @@ function showEventModal(event) {
 
   modal.style.display = 'block';
 
-  // Check booking and seats
   fetch(`/api/user/${userId}`)
     .then(res => res.json())
     .then(userData => {
@@ -108,7 +115,6 @@ function showEventModal(event) {
       const seatsCount = document.getElementById('seats-count');
       let seats = event.seats;
 
-      // If seats are 0 and not already booked, disable booking
       if (seats <= 0 && !booked) {
         bookBtn.textContent = 'Sold Out';
         bookBtn.disabled = true;
@@ -118,7 +124,6 @@ function showEventModal(event) {
       }
 
       bookBtn.onclick = async () => {
-        // Prevent booking if sold out
         if (seats <= 0 && !booked) return;
 
         const res = await fetch('/api/book', {
@@ -128,15 +133,9 @@ function showEventModal(event) {
         });
         const data = await res.json();
 
-        // Update seats count locally for instant feedback
-        if (data.booked) {
-          seats -= 1;
-        } else {
-          seats += 1;
-        }
+        seats = data.booked ? seats - 1 : seats + 1;
         seatsCount.textContent = seats;
 
-        // Update button state
         if (seats <= 0 && !data.booked) {
           bookBtn.textContent = 'Sold Out';
           bookBtn.disabled = true;
@@ -147,11 +146,10 @@ function showEventModal(event) {
 
         alert(data.message || 'Booking updated');
         fetchEvents();
-        showEventModal({ ...event, seats }); // Pass updated seats
+        showEventModal({ ...event, seats });
       };
     });
 
-  // Toggle favorite
   const favBtn = content.querySelector('.fav-btn');
   const icon = favBtn.querySelector('i');
   favBtn.onclick = async () => {
@@ -165,7 +163,3 @@ function showEventModal(event) {
     fetchEvents();
   };
 }
-
-<div id="event-modal" class="modal" style="display:none;">
-  <div id="event-details" class="modal-content"></div>
-</div>

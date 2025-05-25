@@ -2,6 +2,17 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchOrganizerEvents();
   loadOrganizerProfile();
   setupProfileEditing();
+
+  // ESC key to close modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeForm();
+  });
+
+  // Close modal when clicking outside
+  document.addEventListener('click', (e) => {
+    const modal = document.getElementById('event-modal');
+    if (e.target === modal) closeForm();
+  });
 });
 
 function fetchOrganizerEvents() {
@@ -53,7 +64,8 @@ function renderEventList(events) {
 }
 
 function openForm(mode = 'add', event = null) {
-  document.getElementById('event-modal').classList.remove('hidden');
+  const modal = document.getElementById('event-modal');
+  modal.classList.remove('hidden');
   document.getElementById('modal-title').textContent = mode === 'edit' ? 'Edit Event' : 'Add Event';
   clearForm();
 
@@ -67,7 +79,7 @@ function openForm(mode = 'add', event = null) {
     document.getElementById('event-price').value = event.price || 0;
   }
 
-  const actions = document.querySelector('.modal-actions');
+  const actions = modal.querySelector('.modal-actions');
   actions.innerHTML = `
     <input type="file" id="event-image" accept="image/*">
     <button onclick="${mode === 'edit' ? `updateEvent('${event._id}')` : 'saveEvent()'}">${mode === 'edit' ? 'Update' : 'Save'}</button>
@@ -76,16 +88,22 @@ function openForm(mode = 'add', event = null) {
 }
 
 function closeForm() {
-  document.getElementById('event-modal').classList.add('hidden');
+  const modal = document.getElementById('event-modal');
+  modal.classList.add('hidden');
   clearForm();
 }
 
 function clearForm() {
-  ['event-name', 'event-location', 'event-date', 'event-seats', 'event-description', 'event-category', 'event-price'].forEach(id => {
-    document.getElementById(id).value = '';
+  const fields = ['event-name', 'event-location', 'event-date', 'event-seats', 'event-description', 'event-category', 'event-price'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
   });
-  const imageInput = document.getElementById('event-image');
-  if (imageInput) imageInput.value = '';
+  const oldInput = document.getElementById('event-image');
+  if (oldInput) {
+    const newInput = oldInput.cloneNode(true);
+    oldInput.parentNode.replaceChild(newInput, oldInput);
+  }
 }
 
 async function saveEvent() {
@@ -173,7 +191,7 @@ function getFormData() {
   return formData;
 }
 
-// Organizer Profile Editing
+// Organizer Profile
 function loadOrganizerProfile() {
   const userId = localStorage.getItem('userId');
   fetch(`/api/user/${userId}`)
